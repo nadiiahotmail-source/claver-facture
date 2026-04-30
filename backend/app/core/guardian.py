@@ -8,10 +8,12 @@ class Sentinel:
     def __init__(self):
         # Sensitive patterns for PII protection
         self.pii_patterns = {
-            "policy_number": r"\b[A-Z0-9]{5,15}\b", # Simplified policy number pattern
-            "phone_number": r"\+?\d{10,15}",
+            "policy_number": r"\b[A-Z0-9]{5,20}\b",
+            "phone_number": r"(\+?\d{1,3}[-.\s]?)?\(?\d{1,4}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}",
             "email": r"[\w\.-]+@[\w\.-]+\.\w+",
-            "iban": r"[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}([A-Z0-9]?){0,16}"
+            "iban": r"[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}([A-Z0-9]?){0,16}",
+            "siret": r"\b\d{14}\b",
+            "bce": r"\b\d{10}\b"
         }
 
     def verify_data(self, data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
@@ -20,15 +22,24 @@ class Sentinel:
         """
         logger.info("Sentinel auditing extracted data")
         
-        # In a real scenario, we might want to mask specific fields in the DB 
-        # or just ensure they are present and valid.
-        # For now, we validate the format.
-        
-        masked_data = data.copy()
-        # Logic to mask data if it's for logging
-        # ...
-        
-        return True, masked_data
+        # Validation of financial data
+        if data.get("amount") and not isinstance(data.get("amount"), (int, float)):
+            try:
+                data["amount"] = float(str(data["amount"]).replace(",", ".").replace("€", "").strip())
+            except:
+                logger.warning("Sentinel: Invalid amount format detected")
+                return False, data
+
+        # IBAN Validation (Basic length/start check)
+        if data.get("iban"):
+            iban = str(data["iban"]).replace(" ", "").upper()
+            if not re.match(self.pii_patterns["iban"], iban):
+                logger.warning("Sentinel: Invalid IBAN detected")
+                masked_data = data.copy()
+                masked_data["iban"] = "[INVALID_IBAN]"
+                return False, masked_data
+
+        return True, data
 
     def verify_message(self, message: str) -> Tuple[bool, str]:
         """

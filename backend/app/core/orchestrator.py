@@ -17,7 +17,7 @@ class Orchestrator:
         
     async def process_upload(self, file_path: str, user_id: str) -> Dict[str, Any]:
         """
-        Flow: OCR -> Validation -> Memory Storage
+        Flow: OCR -> Sentinel Audit -> Persistence
         """
         logger.info(f"Orchestrating upload for user {user_id}")
         
@@ -26,23 +26,25 @@ class Orchestrator:
         if not raw_data:
             return {"status": "error", "message": "OCR extraction failed"}
             
-        # 2. Sentinel Check (Policy Enforcement)
-        is_safe, masked_data = self.sentinel.verify_data(raw_data)
-        if not is_safe:
-            return {"status": "error", "message": "Security policy violation detected"}
-            
-        # 3. Memory storage (to be implemented with LanceDB)
-        # await self.memory.store(masked_data, user_id)
+        # 2. Sentinel Check (Validation & Safety)
+        is_safe, validated_data = self.sentinel.verify_data(raw_data)
         
+        # 3. Persistence in Supabase
+        validated_data["status"] = "pending_validation" if is_safe else "security_flagged"
+        saved_reminder = self.db.save_reminder(validated_data, user_id)
+        
+        if not saved_reminder:
+            return {"status": "error", "message": "Failed to save to database"}
+            
         return {
             "status": "success",
-            "data": masked_data,
-            "verification_status": "guardian_verified"
+            "data": saved_reminder,
+            "verification_status": "sentinel_verified" if is_safe else "sentinel_flagged"
         }
 
     async def handle_dispatch(self, reminder_id: str, user_id: str) -> Dict[str, Any]:
         """
-        Flow: Retrieve -> Draft -> Sentinel Check -> Dispatch
+        Flow: Retrieve -> Draft -> Sentinel Check -> Update State
         """
         # 1. Multi-tenant retrieval
         reminder = self.db.get_reminder_safe(reminder_id, user_id)
@@ -52,14 +54,24 @@ class Orchestrator:
         # 2. Contextual drafting
         draft = await self.comm.draft_reminder(reminder)
         
-        # 3. Sentinel validation
-        is_safe, final_msg = self.sentinel.verify_message(draft["body"])
+        # 3. Sentinel validation of the draft
+        is_safe, final_body = self.sentinel.verify_message(draft["body"])
         if not is_safe:
-            return {"status": "error", "message": "Message blocked by Guardian"}
+            self.db.update_status(reminder_id, "blocked_by_sentinel", user_id)
+            return {"status": "error", "message": f"Message blocked by Guardian: {final_body}"}
             
-        # 4. Final dispatch
-        # result = await self.comm.send(reminder["phone"], final_msg)
+        # 4. Update reminder with draft
+        updated_reminder = self.db.update_email_draft(
+            reminder_id, 
+            draft["subject"], 
+            final_body, 
+            user_id
+        )
         
-        return {"status": "sent", "reminder_id": reminder_id}
+        return {
+            "status": "drafted", 
+            "reminder_id": reminder_id, 
+            "data": updated_reminder
+        }
 
 orchestrator = Orchestrator()
