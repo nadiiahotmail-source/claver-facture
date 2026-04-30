@@ -1,5 +1,6 @@
 import google.generativeai as genai
 from typing import Dict, Any
+from app.core.prompts import COMM_DRAFT_PROMPT
 
 class CommAgent:
     def __init__(self):
@@ -9,21 +10,27 @@ class CommAgent:
         """
         Drafts a reminder message based on the client context and urgency.
         """
-        prompt = f"""
-        Rédige un message de rappel d'assurance pour :
-        Client: {reminder_data.get('client_name')}
-        Assureur: {reminder_data.get('insurer')}
-        Montant: {reminder_data.get('amount')}
-        Échéance: {reminder_data.get('due_date')}
-        
-        Le ton doit être professionnel mais bienveillant. 
-        Inclus un appel à l'action clair.
-        Retourne : subject, body.
-        """
+        prompt = COMM_DRAFT_PROMPT.format(
+            client_name=reminder_data.get('client_name'),
+            insurer=reminder_data.get('insurer'),
+            amount=reminder_data.get('amount'),
+            due_date=reminder_data.get('due_date'),
+            iban=reminder_data.get('iban', 'non spécifié')
+        )
         
         response = self.model.generate_content(prompt)
-        # Simplified parsing for demo
+        text = response.text
+        
+        # Parsing simple du format Subject/Body
+        subject = "Rappel Prime d'Assurance"
+        body = text
+        
+        if "Subject:" in text and "Body:" in text:
+            parts = text.split("Body:")
+            subject = parts[0].replace("Subject:", "").strip()
+            body = parts[1].strip()
+            
         return {
-            "subject": f"Rappel Prime d'Assurance - {reminder_data.get('insurer')}",
-            "body": response.text
+            "subject": subject,
+            "body": body
         }
