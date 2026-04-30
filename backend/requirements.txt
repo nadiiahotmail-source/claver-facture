@@ -9,5 +9,3 @@ pydantic
 python-multipart
 resend
 httpx
-lancedb
-pyarrow
