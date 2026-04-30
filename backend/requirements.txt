@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+psycopg2-binary
+supabase
+python-dotenv
+slowapi
+google-generativeai
+pydantic
+python-multipart
