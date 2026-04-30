@@ -1,23 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  Settings, 
-  Key, 
-  Mail, 
-  MessageSquare, 
-  Save, 
-  Shield, 
-  Zap,
-  CheckCircle2,
-  AlertCircle,
-  Smartphone,
-  Cpu,
-  Palette,
-  QrCode,
-  Info
-} from "lucide-react";
 import { motion } from "framer-motion";
+import { getSettings, saveSettings } from "@/lib/api";
+import { toast } from "sonner";
+import { Cpu, Key, Mail, Smartphone, QrCode, Zap, CheckCircle2, Save } from "lucide-react";
 
 export default function SettingsPage() {
   const [geminiKey, setGeminiKey] = useState("");
@@ -26,12 +13,33 @@ export default function SettingsPage() {
   const [waMode, setWaMode] = useState("native"); // native | official
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
 
+  React.useEffect(() => {
+    getSettings().then(data => {
+      setGeminiKey(data.gemini_key || "");
+      setEmailKey(data.resend_key || "");
+      setTone(data.tone || "courteous");
+      setWaMode(data.whatsapp_mode || "native");
+    }).catch(console.error);
+  }, []);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("saving");
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setStatus("success");
-    setTimeout(() => setStatus("idle"), 3000);
+    try {
+      await saveSettings({
+        gemini_key: geminiKey,
+        resend_key: emailKey,
+        tone,
+        whatsapp_mode: waMode
+      });
+      setStatus("success");
+      toast.success("Paramètres synchronisés avec le backend.");
+    } catch (error) {
+      setStatus("error");
+      toast.error("Échec de la sauvegarde.");
+    } finally {
+      setTimeout(() => setStatus("idle"), 3000);
+    }
   };
 
   return (

@@ -1,10 +1,19 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Search, FileText } from "lucide-react";
-import { MOCK_REMINDERS } from "@/lib/mockData";
+import { getReminders } from "@/lib/api";
 
 export default function RemindersPage() {
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getReminders()
+      .then(setReminders)
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="p-12 max-w-7xl mx-auto space-y-12">
       <header className="space-y-4">
@@ -35,7 +44,7 @@ export default function RemindersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {MOCK_REMINDERS.map((item) => (
+            {reminders.map((item) => (
               <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-8 py-6">
                   <p className="font-bold text-slate-900">{item.client_name}</p>
@@ -55,6 +64,13 @@ export default function RemindersPage() {
                 </td>
               </tr>
             ))}
+            {reminders.length === 0 && !loading && (
+              <tr>
+                <td colSpan={4} className="px-8 py-12 text-center text-slate-400 italic">
+                  Aucun rappel trouvé.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

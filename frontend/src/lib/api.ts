@@ -55,3 +55,19 @@ export async function sendReminder(id: string) {
   if (!res.ok) throw new Error("Failed to send reminder");
   return res.json();
 }
+
+export async function getSettings() {
+  const res = await authenticatedFetch("/settings");
+  if (!res.ok) throw new Error("Failed to fetch settings");
+  return res.json();
+}
+
+export async function saveSettings(data: any) {
+  const res = await authenticatedFetch("/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to save settings");
+  return res.json();
+}

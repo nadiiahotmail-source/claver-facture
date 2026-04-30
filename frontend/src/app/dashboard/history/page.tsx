@@ -12,16 +12,18 @@ import {
   Mail,
   MessageSquare
 } from "lucide-react";
-
-const mockHistory = [
-  { id: 1, client: "Dubois Bistro", date: "2024-04-20", insurer: "AXA", amount: 450.00, status: "sent", method: "Email" },
-  { id: 2, client: "Techova Café", date: "2024-04-21", insurer: "AG Insurance", amount: 1250.50, status: "pending", method: "SMS" },
-  { id: 3, client: "Mediapulse SPRL", date: "2024-04-18", insurer: "Allianz", amount: 890.00, status: "failed", method: "WhatsApp" },
-  { id: 4, client: "Claver Facture", date: "2024-04-15", insurer: "Baloise", amount: 2100.00, status: "sent", method: "Email" },
-];
+import { getReminders } from "@/lib/api";
 
 export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [history, setHistory] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    getReminders().then(data => {
+      const sentItems = data.filter((i: any) => i.status === 'sent');
+      setHistory(sentItems);
+    }).catch(console.error);
+  }, []);
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -70,18 +72,16 @@ export default function HistoryPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {mockHistory.map((item) => (
+            {history.filter(i => i.client_name.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
               <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-8 py-5 text-sm font-bold text-slate-900">{item.client}</td>
-                <td className="px-6 py-5 text-sm text-slate-500 font-mono">{item.date}</td>
+                <td className="px-8 py-5 text-sm font-bold text-slate-900">{item.client_name}</td>
+                <td className="px-6 py-5 text-sm text-slate-500 font-mono">{item.created_at?.split('T')[0]}</td>
                 <td className="px-6 py-5 text-sm text-slate-600">{item.insurer}</td>
                 <td className="px-6 py-5 text-sm font-bold text-slate-900">{item.amount.toFixed(2)} €</td>
                 <td className="px-6 py-5 text-sm text-slate-500">
                   <div className="flex items-center gap-2">
-                    {item.method === "Email" && <Mail className="w-3 h-3 text-blue-500" />}
-                    {item.method === "SMS" && <MessageSquare className="w-3 h-3 text-emerald-500" />}
-                    {item.method === "WhatsApp" && <MessageSquare className="w-3 h-3 text-green-500" />}
-                    {item.method}
+                    <Mail className="w-3 h-3 text-blue-500" />
+                    Email
                   </div>
                 </td>
                 <td className="px-6 py-5">

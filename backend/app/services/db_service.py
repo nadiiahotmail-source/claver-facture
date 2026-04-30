@@ -188,3 +188,57 @@ class DBService:
             return None
         finally:
             self._release_connection(conn)
+
+    def get_settings(self, user_id: str):
+        """Fetches system settings for a user."""
+        conn = self._get_connection()
+        if not conn: return {}
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT gemini_key, resend_key, tone, whatsapp_mode FROM settings WHERE user_id = %s;", (user_id,))
+            result = cur.fetchone()
+            if not result: return {}
+            columns = [desc[0] for desc in cur.description]
+            cur.close()
+            return dict(zip(columns, result))
+        except Exception as e:
+            print(f"Error fetching settings: {e}")
+            return {}
+        finally:
+            self._release_connection(conn)
+
+    def save_settings(self, user_id: str, data: dict):
+        """Saves or updates system settings for a user."""
+        conn = self._get_connection()
+        if not conn: return None
+        try:
+            cur = conn.cursor()
+            query = """
+                INSERT INTO settings (user_id, gemini_key, resend_key, tone, whatsapp_mode, updated_at)
+                VALUES (%s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (user_id) DO UPDATE SET
+                    gemini_key = EXCLUDED.gemini_key,
+                    resend_key = EXCLUDED.resend_key,
+                    tone = EXCLUDED.tone,
+                    whatsapp_mode = EXCLUDED.whatsapp_mode,
+                    updated_at = NOW()
+                RETURNING *;
+            """
+            cur.execute(query, (
+                user_id,
+                data.get('gemini_key'),
+                data.get('resend_key'),
+                data.get('tone', 'courteous'),
+                data.get('whatsapp_mode', 'native')
+            ))
+            result = cur.fetchone()
+            conn.commit()
+            columns = [desc[0] for desc in cur.description]
+            cur.close()
+            return dict(zip(columns, result))
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+            conn.rollback()
+            return None
+        finally:
+            self._release_connection(conn)

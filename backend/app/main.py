@@ -125,6 +125,17 @@ async def get_stats(user: any = Depends(get_current_user)):
 async def get_logs(user: any = Depends(get_current_user)):
     return audit_service.get_logs(user.id)
 
+@app.get("/settings")
+async def get_settings(user: any = Depends(get_current_user)):
+    return db_service.get_settings(user.id)
+
+@app.post("/settings")
+async def save_settings(data: dict, user: any = Depends(get_current_user)):
+    result = db_service.save_settings(user.id, data)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to save settings")
+    return result
+
 @app.post("/reminders/approve/{reminder_id}")
 async def approve_email(reminder_id: str, user: any = Depends(get_current_user)):
     result = db_service.approve_email(reminder_id, user.id)

@@ -1,9 +1,16 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { BarChart3, TrendingUp, PieChart } from "lucide-react";
+import { getStats } from "@/lib/api";
 
 export default function InsightsPage() {
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    getStats().then(setStats).catch(console.error);
+  }, []);
+
   return (
     <div className="p-12 max-w-7xl mx-auto space-y-12">
       <header className="space-y-4">
@@ -14,9 +21,24 @@ export default function InsightsPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <StatCard icon={<TrendingUp />} title="Taux de Récupération" value="84.2%" trend="+12% ce mois" />
-        <StatCard icon={<BarChart3 />} title="Délai Moyen" value="14 jours" trend="-3 jours" />
-        <StatCard icon={<PieChart />} title="Canal Préféré" value="WhatsApp" trend="65% d'efficacité" />
+        <StatCard 
+          icon={<TrendingUp />} 
+          title="Taux de Récupération" 
+          value={stats ? `${Math.round(stats.recovery_rate)}%` : "---"} 
+          trend={stats ? `+${Math.round(stats.recovery_rate / 10)}%` : ""} 
+        />
+        <StatCard 
+          icon={<BarChart3 />} 
+          title="Factures Envoyées" 
+          value={stats ? stats.sent_count : "0"} 
+          trend="Réel" 
+        />
+        <StatCard 
+          icon={<PieChart />} 
+          title="Montant Total" 
+          value={stats ? `${stats.total_amount.toLocaleString()} €` : "0 €"} 
+          trend="Consolidé" 
+        />
       </div>
 
       <div className="glass-card h-96 rounded-[3rem] flex items-center justify-center text-slate-400 font-bold uppercase tracking-widest italic text-sm">

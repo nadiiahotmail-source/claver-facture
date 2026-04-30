@@ -1,22 +1,40 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Menu, X, FileText, CheckCircle2 } from "lucide-react";
-import { MOCK_REMINDERS } from "@/lib/mockData";
+import { getReminders, approveReminder } from "@/lib/api";
 import IStudioEditor from "@/components/IStudioEditor";
 
 export default function StudioPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [items, setItems] = useState(MOCK_REMINDERS);
+  const [items, setItems] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const reminders = await getReminders();
+      setItems(reminders);
+    } catch (error) {
+      console.error("Studio fetch error:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
   
   const selectedItem = items.find(r => r.id === selectedId);
-  const pendingItems = items.filter(r => r.status !== 'sent' && r.status !== 'validated');
+  const pendingItems = items.filter(r => r.status === 'pending' || r.status === 'drafted');
 
-  const handleApprove = (id: string) => {
-    setItems(items.map(i => i.id === id ? { ...i, status: 'validated' } : i));
-    setSelectedId(null); // Return to home screen after validation
+  const handleApprove = async (id: string) => {
+    try {
+      await approveReminder(id);
+      fetchData();
+      setSelectedId(null);
+    } catch (error) {
+      console.error("Approve error:", error);
+    }
   };
 
   return (
