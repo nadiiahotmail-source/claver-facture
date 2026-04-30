@@ -145,7 +145,7 @@ export default function DashboardPage() {
               <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <Plus className="w-4 h-4" /> Nouvelle Ingestion
               </h3>
-              <UploadZone onDataParsed={fetchReminders} />
+              <UploadZone onDataParsed={fetchData} />
             </div>
 
             <div className="bg-slate-900 rounded-3xl shadow-xl p-6 text-white relative overflow-hidden">
