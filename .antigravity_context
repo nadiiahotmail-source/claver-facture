@@ -1,0 +1,13 @@
+{
+  "project_name": "CLAVER Facture",
+  "project_id": "claver_facture_2026",
+  "last_conversation_id": "d78caf08-7b9c-4936-9563-233738316d10",
+  "session_history": [
+    "eab32c7d-3856-4a65-a397-ed1014fa6136",
+    "d78caf08-7b9c-4936-9563-233738316d10"
+  ],
+  "brain_path": "C:/Users/Devops/.gemini/antigravity/brain/d78caf08-7b9c-4936-9563-233738316d10",
+  "status": "Production-Ready",
+  "auth_state": "Real Supabase Auth Integrated",
+  "security_state": "JWT + CORS + RateLimit Active"
+}
