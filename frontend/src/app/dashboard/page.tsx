@@ -9,95 +9,85 @@ import {
   ArrowRightCircle,
   FileText
 } from "lucide-react";
-import { authenticatedFetch } from "@/lib/api";
-import { MOCK_REMINDERS } from "@/lib/mockData";
+import { 
+  getReminders, 
+  getStats, 
+  draftReminder, 
+  approveReminder, 
+  sendReminder 
+} from "@/lib/api";
 import ValidationTable from "@/components/ValidationTable";
 import UploadZone from "@/components/UploadZone";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
-  const [invoices, setInvoices] = useState<any[]>(MOCK_REMINDERS);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [realStats, setRealStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-  const fetchReminders = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await authenticatedFetch(`${API_URL}/reminders`);
-      if (res.ok) {
-        const data = await res.json();
-        setInvoices(data.length > 0 ? data : MOCK_REMINDERS);
-      } else {
-        setInvoices(MOCK_REMINDERS);
-      }
+      const [remindersData, statsData] = await Promise.all([
+        getReminders(),
+        getStats()
+      ]);
+      setInvoices(remindersData);
+      setRealStats(statsData);
     } catch (error) {
-      setInvoices(MOCK_REMINDERS);
+      console.error("Fetch error:", error);
+      toast.error("Échec de la récupération des données.");
     } finally {
       setIsLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
-    fetchReminders();
-  }, [fetchReminders]);
+    fetchData();
+  }, [fetchData]);
 
   // KPI Calculations optimisés selon KaziRelance
   const stats = useMemo(() => {
-    const resolvedInvoices = invoices.filter(i => i.status === 'resolved');
-    const recovered = resolvedInvoices.reduce((acc, curr) => acc + curr.amount, 0);
-    const clientsEnOrdre = resolvedInvoices.length;
-    const clientsSansReponse = invoices.filter(i => i.is_unresponsive).length;
-    
-    // Mocks pour les KPIs de succès
-    const dossiersClosIA = Math.max(0, clientsEnOrdre - 1);
-    const delaiMoyen = "12 jours";
-    
-    const sentOrResolved = invoices.filter(i => ['sent', 'resolved'].includes(i.status)).length;
-    const tauxReponse = sentOrResolved > 0 
-      ? Math.round(((sentOrResolved - clientsSansReponse) / sentOrResolved) * 100) 
-      : 0;
+    if (realStats) return {
+      recovered: realStats.total_amount,
+      clientsEnOrdre: realStats.sent_count,
+      clientsSansReponse: realStats.active_reminders - realStats.sent_count, // Simplified
+      dossiersClosIA: realStats.sent_count,
+      delaiMoyen: "12 jours", // To be calculated on backend later
+      tauxReponse: Math.round(realStats.recovery_rate)
+    };
 
-    return { recovered, clientsEnOrdre, clientsSansReponse, dossiersClosIA, delaiMoyen, tauxReponse };
-  }, [invoices]);
+    return { recovered: 0, clientsEnOrdre: 0, clientsSansReponse: 0, dossiersClosIA: 0, delaiMoyen: "---", tauxReponse: 0 };
+  }, [realStats]);
 
   const handleDispatch = useCallback(async (id: string) => {
     try {
-      const res = await authenticatedFetch(`${API_URL}/reminders/dispatch/${id}`, { method: 'POST' });
-      if (res.ok) {
-        toast.success("Relance expédiée avec succès.");
-        fetchReminders();
-      } else {
-        toast.error("Échec de l'envoi.");
-      }
+      await sendReminder(id);
+      toast.success("Relance expédiée avec succès.");
+      fetchData();
     } catch {
-      toast.error("Erreur réseau.");
+      toast.error("Échec de l'envoi.");
     }
-  }, [API_URL, fetchReminders]);
+  }, [fetchData]);
 
   const handleApprove = useCallback(async (id: string) => {
     try {
-      const res = await authenticatedFetch(`${API_URL}/reminders/approve/${id}`, { method: 'POST' });
-      if (res.ok) {
-        toast.success("Approuvé.");
-        fetchReminders();
-      }
+      await approveReminder(id);
+      toast.success("Approuvé.");
+      fetchData();
     } catch {
-      toast.error("Erreur réseau.");
+      toast.error("Échec de l'approbation.");
     }
-  }, [API_URL, fetchReminders]);
+  }, [fetchData]);
 
   const handleGenerateDraft = useCallback(async (id: string) => {
     try {
-      const res = await authenticatedFetch(`${API_URL}/reminders/draft/${id}`, { method: 'POST' });
-      if (res.ok) {
-        return await res.json();
-      }
-      return null;
+      return await draftReminder(id);
     } catch {
+      toast.error("Échec de la génération du brouillon.");
       return null;
     }
-  }, [API_URL]);
+  }, []);
 
   const handleMarkPaid = useCallback(async (id: string) => {
     toast.success("Paiement validé manuellement.");

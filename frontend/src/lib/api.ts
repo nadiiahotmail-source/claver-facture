@@ -19,3 +19,39 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
     headers,
   });
 }
+
+export async function getReminders() {
+  const res = await authenticatedFetch("/reminders");
+  if (!res.ok) throw new Error("Failed to fetch reminders");
+  return res.json();
+}
+
+export async function getStats() {
+  const res = await authenticatedFetch("/stats");
+  if (!res.ok) throw new Error("Failed to fetch stats");
+  return res.json();
+}
+
+export async function getLogs() {
+  const res = await authenticatedFetch("/logs");
+  if (!res.ok) throw new Error("Failed to fetch logs");
+  return res.json();
+}
+
+export async function draftReminder(id: string) {
+  const res = await authenticatedFetch(`/reminders/draft/${id}`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to draft reminder");
+  return res.json();
+}
+
+export async function approveReminder(id: string) {
+  const res = await authenticatedFetch(`/reminders/approve/${id}`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to approve reminder");
+  return res.json();
+}
+
+export async function sendReminder(id: string) {
+  const res = await authenticatedFetch(`/reminders/dispatch/${id}`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to send reminder");
+  return res.json();
+}

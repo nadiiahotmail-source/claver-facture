@@ -6,6 +6,7 @@ from app.agents.ocr_agent import OCRAgent
 from app.agents.comm_agent import CommAgent
 from app.core.guardian import Sentinel
 from app.services.memory_manager import MemoryManager
+from app.services.audit_service import audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class Orchestrator:
         """
         Flow: OCR -> Sentinel Audit -> Persistence
         """
-        logger.info(f"Orchestrating upload for user {user_id}")
+        audit_service.log_action(user_id, f"Début de l'analyse OCR pour le fichier: {os.path.basename(file_path)}")
         
         # 1. OCR Extraction
         raw_data = await self.ocr.parse_file(file_path)
@@ -40,7 +41,10 @@ class Orchestrator:
 
         # 4. Agentic Memory Storage
         if is_safe:
+            audit_service.log_action(user_id, f"OCR réussi pour {validated_data.get('client_name')} ({validated_data.get('insurer')})", "SUCCESS")
             asyncio.create_task(self.memory.store_context(user_id, saved_reminder))
+        else:
+            audit_service.log_action(user_id, "Violation de sécurité détectée par le Sentinel lors de l'OCR", "WARNING")
             
         return {
             "status": "success",
@@ -52,7 +56,7 @@ class Orchestrator:
         """
         Flow: Retrieve -> Draft -> Sentinel Check -> Update State
         """
-        logger.info(f"Generating draft for reminder {reminder_id}")
+        audit_service.log_action(user_id, f"Génération d'un brouillon pour le rappel {reminder_id}")
         
         # 1. Multi-tenant retrieval
         reminder = self.db.get_reminder_safe(reminder_id, user_id)
@@ -89,7 +93,7 @@ class Orchestrator:
         """
         Flow: Retrieve -> Verify -> Real Dispatch (Email + WhatsApp)
         """
-        logger.info(f"Finalizing dispatch for reminder {reminder_id}")
+        audit_service.log_action(user_id, f"Début du dispatch final pour le rappel {reminder_id}")
         
         # 1. Retrieve the validated draft
         reminder = self.db.get_reminder_safe(reminder_id, user_id)

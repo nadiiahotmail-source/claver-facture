@@ -1,10 +1,16 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Mail, Smartphone, Activity } from "lucide-react";
-import { MOCK_LOGS } from "@/lib/mockData";
+import { getLogs } from "@/lib/api";
 
 export default function BridgesPage() {
+  const [logs, setLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    getLogs().then(setLogs).catch(console.error);
+  }, []);
+
   return (
     <div className="p-12 max-w-7xl mx-auto space-y-12">
       <header className="space-y-4">
@@ -34,11 +40,12 @@ export default function BridgesPage() {
           <Activity className="w-4 h-4 text-emerald-500" /> Logs d'activité en temps réel
         </h3>
         <div className="space-y-3 font-mono text-[10px] text-slate-500">
-          {MOCK_LOGS.map((log, i) => (
+          {logs.map((log, i) => (
             <p key={i} className="flex gap-4">
-              <span className="text-emerald-500">[{log.time}]</span> {log.msg}
+              <span className={log.level === 'WARNING' ? 'text-amber-500' : 'text-emerald-500'}>[{log.time}]</span> {log.msg}
             </p>
           ))}
+          {logs.length === 0 && <p className="text-slate-400 italic">Aucun log disponible.</p>}
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import shutil
 import os
 from app.core.orchestrator import orchestrator
 from app.services.db_service import DBService
+from app.services.audit_service import audit_service
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -105,6 +106,24 @@ async def generate_email_draft(reminder_id: str, user: any = Depends(get_current
     if result["status"] == "error":
         raise HTTPException(status_code=403, detail=result["message"])
     return result
+
+@app.get("/stats")
+async def get_stats(user: any = Depends(get_current_user)):
+    reminders = db_service.get_all_reminders(user.id)
+    total_amount = sum(r.get('amount', 0) for r in reminders)
+    sent_count = len([r for r in reminders if r.get('status') == 'sent'])
+    recovery_rate = (sent_count / len(reminders) * 100) if reminders else 0
+    
+    return {
+        "total_amount": total_amount,
+        "active_reminders": len(reminders),
+        "recovery_rate": recovery_rate,
+        "sent_count": sent_count
+    }
+
+@app.get("/logs")
+async def get_logs(user: any = Depends(get_current_user)):
+    return audit_service.get_logs(user.id)
 
 @app.post("/reminders/approve/{reminder_id}")
 async def approve_email(reminder_id: str, user: any = Depends(get_current_user)):
