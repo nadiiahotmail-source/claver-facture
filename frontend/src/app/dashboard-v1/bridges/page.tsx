@@ -50,7 +50,7 @@ function BridgeCard({ icon, title, desc, status }: { icon: React.ReactNode, titl
     <div className="glass-card p-10 rounded-[2.5rem] space-y-6 relative overflow-hidden group">
       <div className="flex justify-between items-start relative z-10">
         <div className="w-16 h-16 bg-slate-900 rounded-3xl flex items-center justify-center text-emerald-500 border border-slate-800 shadow-xl">
-          {React.cloneElement(icon as React.ReactElement, { className: "w-8 h-8" })}
+          {React.cloneElement(icon as any, { className: "w-8 h-8" })}
         </div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
           <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-glow" />
