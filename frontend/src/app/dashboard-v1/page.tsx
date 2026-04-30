@@ -166,6 +166,7 @@ export default function DashboardPage() {
                 onDispatch={async (id) => {}}
                 onGenerateDraft={async (id) => ({ draft: { subject: "", body: "" } })}
                 onApproveDraft={async (id) => {}}
+                             onMarkPaid={async (id) => {}}
              />
            </div>
         </div>
