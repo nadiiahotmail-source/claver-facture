@@ -1,5 +1,5 @@
-import os
 import google.generativeai as genai
+import resend
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,6 +9,8 @@ class EmailSender:
         # Configure Gemini for email generation
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # Configure Resend
+        resend.api_key = os.getenv("RESEND_API_KEY")
 
     async def generate_draft(self, data: dict):
         """Génère un brouillon d'e-mail professionnel via IA."""
@@ -59,10 +61,21 @@ class EmailSender:
             }
 
     async def send_email(self, recipient_email: str, subject: str, body: str):
-        """Simule l'envoi d'un e-mail (SMTP structure)."""
-        print(f"--- SIMULATION ENVOI E-MAIL ---")
-        print(f"To: {recipient_email}")
-        print(f"Subject: {subject}")
-        print(f"Body: {body[:100]}...")
-        print(f"-------------------------------")
-        return True
+        """Sends an e-mail using Resend API."""
+        if not resend.api_key or resend.api_key == "votre_cle_resend":
+            print("EmailSender: [SIMULATION] Resend API key missing.")
+            return True
+
+        try:
+            params = {
+                "from": "Claver Facture <onboarding@resend.dev>", # Default for test, update for prod
+                "to": [recipient_email],
+                "subject": subject,
+                "html": body.replace("\n", "<br>")
+            }
+            email = resend.Emails.send(params)
+            print(f"EmailSender: Sent via Resend ID: {email.get('id')}")
+            return True
+        except Exception as e:
+            print(f"EmailSender Error: {e}")
+            return False

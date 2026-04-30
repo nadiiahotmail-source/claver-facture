@@ -42,10 +42,12 @@ class Orchestrator:
             "verification_status": "sentinel_verified" if is_safe else "sentinel_flagged"
         }
 
-    async def handle_dispatch(self, reminder_id: str, user_id: str) -> Dict[str, Any]:
+    async def handle_draft(self, reminder_id: str, user_id: str) -> Dict[str, Any]:
         """
         Flow: Retrieve -> Draft -> Sentinel Check -> Update State
         """
+        logger.info(f"Generating draft for reminder {reminder_id}")
+        
         # 1. Multi-tenant retrieval
         reminder = self.db.get_reminder_safe(reminder_id, user_id)
         if not reminder:
@@ -72,6 +74,45 @@ class Orchestrator:
             "status": "drafted", 
             "reminder_id": reminder_id, 
             "data": updated_reminder
+        }
+
+    async def handle_send(self, reminder_id: str, user_id: str) -> Dict[str, Any]:
+        """
+        Flow: Retrieve -> Verify -> Real Dispatch (Email + WhatsApp)
+        """
+        logger.info(f"Finalizing dispatch for reminder {reminder_id}")
+        
+        # 1. Retrieve the validated draft
+        reminder = self.db.get_reminder_safe(reminder_id, user_id)
+        if not reminder or not reminder.get("is_validated"):
+            return {"status": "error", "message": "Reminder not validated or not found"}
+
+        # 2. Parallel dispatch (Email + WhatsApp)
+        # Note: In production, we might want to check user preferences first
+        
+        results = {}
+        
+        # Email Dispatch (if email present)
+        if reminder.get("client_email"):
+            results["email"] = await self.comm.send_email(
+                reminder["client_email"], 
+                reminder["email_subject"], 
+                reminder["email_body"]
+            )
+            
+        # WhatsApp Dispatch (if phone present)
+        if reminder.get("phone_number"):
+            results["whatsapp"] = await self.comm.send_whatsapp(
+                reminder["phone_number"], 
+                reminder
+            )
+            
+        # 3. Final state update
+        self.db.mark_email_sent(reminder_id, user_id)
+        
+        return {
+            "status": "sent",
+            "results": results
         }
 
 orchestrator = Orchestrator()

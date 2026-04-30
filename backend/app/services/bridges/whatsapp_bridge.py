@@ -1,6 +1,5 @@
-import asyncio
-import random
 import os
+import httpx
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -13,27 +12,35 @@ class WhatsAppProvider:
 class NativeWhatsAppBridge(WhatsAppProvider):
     """Pont basé sur WhatsApp Web / Baileys ou Playwright."""
     def __init__(self):
-        self.session_active = False
-
-    async def connect(self):
-        """Simule une connexion par QR Code."""
-        print("WhatsApp Bridge: Initialisation de la session Native...")
-        await asyncio.sleep(1)
-        self.session_active = True
-        print("WhatsApp Bridge: Connecté.")
+        self.api_url = os.getenv("WHATSAPP_API_URL", "http://localhost:3001")
+        self.session_active = True # Assumed active for this implementation
 
     async def send_message(self, phone: str, message: str):
-        if not self.session_active:
-            await self.connect()
+        print(f"WhatsApp Bridge: Appui sur le service Baileys à {self.api_url}...")
         
-        # Anti-spam: délai entre 1 et 3 secondes
-        delay = random.uniform(1, 3)
-        print(f"WhatsApp Bridge: Attente de {delay:.2f}s (anti-spam)...")
-        await asyncio.sleep(delay)
-        
-        print(f"WhatsApp Bridge: ENVOI RÉEL à {phone} -> Message: {message[:50]}...")
-        # Ici, on appellerait l'API locale du bridge (ex: via HTTP post à un service Baileys)
-        return True
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.api_url}/send-message",
+                    json={
+                        "phone": phone,
+                        "message": message
+                    },
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    print(f"WhatsApp Bridge: Message envoyé avec succès à {phone}.")
+                    return True
+                else:
+                    print(f"WhatsApp Bridge Error: Service returned {response.status_code}")
+                    return False
+        except Exception as e:
+            print(f"WhatsApp Bridge Error: Connection failed: {e}")
+            # Fallback to simulation for now if requested by user or for dev
+            if os.getenv("DEV_MODE") == "true":
+                print("WhatsApp Bridge: [SIMULATION] Envoi réussi en mode DEV.")
+                return True
+            return False
 
 class OfficialWhatsAppAPI(WhatsAppProvider):
     """Pont basé sur l'API Officielle Meta Cloud."""

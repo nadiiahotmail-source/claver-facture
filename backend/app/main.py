@@ -101,7 +101,7 @@ async def confirm_reminder(data: InvoiceData, user: any = Depends(get_current_us
 @app.post("/reminders/draft/{reminder_id}")
 async def generate_email_draft(reminder_id: str, user: any = Depends(get_current_user)):
     # The Orchestrator handles drafting and sentinel verification
-    result = await orchestrator.handle_dispatch(reminder_id, user.id)
+    result = await orchestrator.handle_draft(reminder_id, user.id)
     if result["status"] == "error":
         raise HTTPException(status_code=403, detail=result["message"])
     return result
@@ -116,7 +116,7 @@ async def approve_email(reminder_id: str, user: any = Depends(get_current_user))
 @app.post("/reminders/dispatch/{reminder_id}")
 async def dispatch_reminder(reminder_id: str, user: any = Depends(get_current_user)):
     # Logic for final dispatch through agent
-    result = await orchestrator.handle_dispatch(reminder_id, user.id)
+    result = await orchestrator.handle_send(reminder_id, user.id)
     return result
 
 if __name__ == "__main__":
