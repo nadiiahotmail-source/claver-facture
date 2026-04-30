@@ -11,4 +11,3 @@ resend
 httpx
 lancedb
 pyarrow
-sentence-transformers

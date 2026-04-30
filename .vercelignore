@@ -1,0 +1,6 @@
+frontend/
+node_modules/
+supabase/
+.git/
+.antigravity_context
+data/
