@@ -10,16 +10,19 @@ class CommAgent:
         self.email_bridge = EmailSender()
         self.whatsapp_bridge = WhatsAppDispatcher()
 
-    async def draft_reminder(self, reminder_data: Dict[str, Any]) -> Dict[str, str]:
+    async def draft_reminder(self, reminder_data: Dict[str, Any], past_context: List[Any] = []) -> Dict[str, str]:
         """
-        Drafts a reminder message based on the client context and urgency.
+        Drafts a reminder message based on the client context, urgency, and past interactions.
         """
+        context_str = "\n".join([str(c['text']) for c in past_context]) if past_context else "Aucun historique trouvé."
+        
         prompt = COMM_DRAFT_PROMPT.format(
             client_name=reminder_data.get('client_name'),
             insurer=reminder_data.get('insurer'),
             amount=reminder_data.get('amount'),
             due_date=reminder_data.get('due_date'),
-            iban=reminder_data.get('iban', 'non spécifié')
+            iban=reminder_data.get('iban', 'non spécifié'),
+            context=context_str
         )
         
         response = self.model.generate_content(prompt)

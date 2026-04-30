@@ -5,6 +5,7 @@ from app.services.db_service import DBService
 from app.agents.ocr_agent import OCRAgent
 from app.agents.comm_agent import CommAgent
 from app.core.guardian import Sentinel
+from app.services.memory_manager import MemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ class Orchestrator:
         self.ocr = OCRAgent()
         self.comm = CommAgent()
         self.sentinel = Sentinel()
+        self.memory = MemoryManager()
         
     async def process_upload(self, file_path: str, user_id: str) -> Dict[str, Any]:
         """
@@ -35,6 +37,10 @@ class Orchestrator:
         
         if not saved_reminder:
             return {"status": "error", "message": "Failed to save to database"}
+
+        # 4. Agentic Memory Storage
+        if is_safe:
+            asyncio.create_task(self.memory.store_context(user_id, saved_reminder))
             
         return {
             "status": "success",
@@ -53,8 +59,11 @@ class Orchestrator:
         if not reminder:
             return {"status": "error", "message": "Unauthorized or not found"}
             
-        # 2. Contextual drafting
-        draft = await self.comm.draft_reminder(reminder)
+        # 2. Memory Retrieval (Context-awareness)
+        past_context = await self.memory.search_context(user_id, reminder["client_name"])
+        
+        # 3. Contextual drafting
+        draft = await self.comm.draft_reminder(reminder, past_context)
         
         # 3. Sentinel validation of the draft
         is_safe, final_body = self.sentinel.verify_message(draft["body"])

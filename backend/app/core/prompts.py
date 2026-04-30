@@ -36,6 +36,9 @@ Assureur: {insurer}
 Montant: {amount}
 Échéance: {due_date}
 
+Historique/Contexte :
+{context}
+
 Structure du message :
 1. Salutations personnalisées.
 2. Rappel de la prime due et de l'échéance.
