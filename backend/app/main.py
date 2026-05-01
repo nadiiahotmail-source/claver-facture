@@ -28,7 +28,8 @@ app.add_middleware(
         "http://localhost:3000", 
         "http://127.0.0.1:3000",
         "https://claver-facture-web.vercel.app",
-        "https://claver-facture.vercel.app"
+        "https://claver-facture.vercel.app",
+        "https://claver-facture-web-git-main-nadiiahotmail-sources-projects.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],

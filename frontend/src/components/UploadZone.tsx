@@ -43,7 +43,7 @@ export default function UploadZone({ onDataParsed }: UploadZoneProps) {
     formData.append("file", selectedFile);
 
     try {
-      const response = await authenticatedFetch("http://localhost:8000/upload", {
+      const response = await authenticatedFetch("/upload", {
         method: "POST",
         body: formData,
       });
