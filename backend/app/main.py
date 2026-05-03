@@ -1,18 +1,19 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uvicorn
 import shutil
 import os
+import uuid
 from app.core.orchestrator import orchestrator
 from app.services.db_service import DBService
-from app.services.audit_service import audit_service
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-import uuid
+from types import SimpleNamespace
+
 
 app = FastAPI(title="KaziRelance AI Agentic API")
 
@@ -24,15 +25,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000", 
-        "http://127.0.0.1:3000",
-        "https://claver-facture-web.vercel.app",
-        "https://claver-facture.vercel.app",
-        "https://claver-facture-web-git-main-nadiiahotmail-sources-projects.vercel.app"
-    ],
+    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:3000"), "http://127.0.0.1:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -41,17 +36,19 @@ db_service = DBService()
 
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """Verifies the Supabase JWT token and returns the user ID."""
-    if os.getenv("DEV_MODE") == "true":
-        class MockUser:
-            id = "00000000-0000-0000-0000-000000000000"
-        return MockUser()
-        
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+    
     if not credentials:
+        if dev_mode:
+            return SimpleNamespace(id="00000000-0000-0000-0000-000000000000", email="dev@kazi.local")
         raise HTTPException(status_code=401, detail="Authentication credentials missing")
         
     token = credentials.credentials
+    
+    if dev_mode and token == "mock-token":
+        return SimpleNamespace(id="00000000-0000-0000-0000-000000000000", email="dev@kazi.local")
+
     try:
-        # Verify token with Supabase
         response = db_service.supabase.auth.get_user(token)
         if not response or not response.user:
             raise HTTPException(status_code=401, detail="Invalid authentication token")
@@ -59,21 +56,40 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
-class InvoiceData(BaseModel):
-    client_name: str
-    insurer: str
-    amount: float
-    due_date: str
-    policy_number: Optional[str] = None
-    phone_number: Optional[str] = None
+# --- Models ---
+
+class ValidationRequest(BaseModel):
+    approved: bool
+    corrections: Optional[Dict[str, Any]] = None
+
+class DispatchRequest(BaseModel):
+    channel: str = "both" # "email", "whatsapp", "both"
+
+class SettingsUpdate(BaseModel):
+    gemini_api_key_enc: Optional[str] = None
+    resend_api_key_enc: Optional[str] = None
+    twilio_account_sid_enc: Optional[str] = None
+    twilio_auth_token_enc: Optional[str] = None
+    whatsapp_bridge_mode: str = "native"
+    email_signature: Optional[str] = None
+    communication_tone: str = "courtois"
+
+# --- Endpoints ---
 
 @app.get("/")
 async def root():
     return {"message": "KaziRelance AI Backend is Active"}
 
 @app.get("/reminders")
-async def get_reminders(user: any = Depends(get_current_user)):
-    return db_service.get_all_reminders(user.id)
+async def get_reminders(status: Optional[str] = None, user: any = Depends(get_current_user)):
+    return db_service.get_all_reminders(user.id, status)
+
+@app.get("/reminders/{reminder_id}")
+async def get_reminder(reminder_id: str, user: any = Depends(get_current_user)):
+    reminder = db_service.get_reminder_by_id(reminder_id, user.id)
+    if not reminder:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return reminder
 
 @app.post("/upload")
 @limiter.limit("10/minute")
@@ -89,7 +105,7 @@ async def upload_invoice(request: Request, file: UploadFile = File(...), user: a
         shutil.copyfileobj(file.file, buffer)
     
     try:
-        # Delegate to Orchestrator
+        db_service.save_audit_log(user.id, "upload_started", {"filename": file.filename}, request.client.host)
         result = await orchestrator.process_upload(temp_path, user.id)
         if result["status"] == "error":
             raise HTTPException(status_code=500, detail=result["message"])
@@ -98,61 +114,64 @@ async def upload_invoice(request: Request, file: UploadFile = File(...), user: a
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-@app.post("/reminders/confirm")
-async def confirm_reminder(data: InvoiceData, user: any = Depends(get_current_user)):
-    result = db_service.save_reminder(data.dict(), user.id)
+@app.post("/reminders/validate/{reminder_id}")
+async def validate_reminder(reminder_id: str, data: ValidationRequest, user: any = Depends(get_current_user)):
+    status = "validated" if data.approved else "rejected"
+    updates = {"status": status, "is_validated": data.approved}
+    if data.corrections:
+        updates["human_corrections"] = data.corrections
+        # Apply corrections to the main fields if they exist
+        for k, v in data.corrections.items():
+            if k in ["client_name", "amount", "due_date", "client_email", "client_phone"]:
+                updates[k] = v
+
+    result = db_service.update_reminder(reminder_id, user.id, updates)
     if not result:
-        raise HTTPException(status_code=500, detail="Erreur lors de la sauvegarde")
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    
+    db_service.save_audit_log(user.id, f"reminder_{status}", {"id": reminder_id})
     return {"status": "success", "data": result}
+
+# Alias for frontend backward compatibility
+@app.post("/reminders/approve/{reminder_id}")
+async def approve_reminder_alias(reminder_id: str, user: any = Depends(get_current_user)):
+    return await validate_reminder(reminder_id, ValidationRequest(approved=True), user)
 
 @app.post("/reminders/draft/{reminder_id}")
 async def generate_email_draft(reminder_id: str, user: any = Depends(get_current_user)):
-    # The Orchestrator handles drafting and sentinel verification
     result = await orchestrator.handle_draft(reminder_id, user.id)
     if result["status"] == "error":
         raise HTTPException(status_code=403, detail=result["message"])
     return result
 
-@app.get("/stats")
-async def get_stats(user: any = Depends(get_current_user)):
-    reminders = db_service.get_all_reminders(user.id)
-    total_amount = sum(r.get('amount', 0) for r in reminders)
-    sent_count = len([r for r in reminders if r.get('status') == 'sent'])
-    recovery_rate = (sent_count / len(reminders) * 100) if reminders else 0
-    
-    return {
-        "total_amount": total_amount,
-        "active_reminders": len(reminders),
-        "recovery_rate": recovery_rate,
-        "sent_count": sent_count
-    }
+@app.post("/reminders/dispatch/{reminder_id}")
+@limiter.limit("5/minute")
+async def dispatch_reminder(request: Request, reminder_id: str, data: Optional[DispatchRequest] = None, user: any = Depends(get_current_user)):
+    # data can be null if frontend doesn't send body
+    channel = data.channel if data else "both"
+    result = await orchestrator.handle_send(reminder_id, user.id, channel)
+    db_service.save_audit_log(user.id, "reminder_dispatched", {"id": reminder_id, "channel": channel})
+    return result
 
-@app.get("/logs")
-async def get_logs(user: any = Depends(get_current_user)):
-    return audit_service.get_logs(user.id)
+@app.get("/dashboard/stats")
+async def get_dashboard_stats(user: any = Depends(get_current_user)):
+    return db_service.get_stats(user.id)
+
+# Alias for frontend
+@app.get("/stats")
+async def get_stats_alias(user: any = Depends(get_current_user)):
+    return await get_dashboard_stats(user)
 
 @app.get("/settings")
 async def get_settings(user: any = Depends(get_current_user)):
     return db_service.get_settings(user.id)
 
 @app.post("/settings")
-async def save_settings(data: dict, user: any = Depends(get_current_user)):
-    result = db_service.save_settings(user.id, data)
+@limiter.limit("3/minute")
+async def save_settings(request: Request, data: SettingsUpdate, user: any = Depends(get_current_user)):
+    result = db_service.save_settings(user.id, data.dict(exclude_unset=True))
     if not result:
         raise HTTPException(status_code=500, detail="Failed to save settings")
-    return result
-
-@app.post("/reminders/approve/{reminder_id}")
-async def approve_email(reminder_id: str, user: any = Depends(get_current_user)):
-    result = db_service.approve_email(reminder_id, user.id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Rappel non trouvé ou non autorisé")
-    return {"status": "validated", "data": result}
-
-@app.post("/reminders/dispatch/{reminder_id}")
-async def dispatch_reminder(reminder_id: str, user: any = Depends(get_current_user)):
-    # Logic for final dispatch through agent
-    result = await orchestrator.handle_send(reminder_id, user.id)
     return result
 
 if __name__ == "__main__":
