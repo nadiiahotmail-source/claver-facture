@@ -114,7 +114,7 @@ export default function UploadZone({ onDataParsed }: UploadZoneProps) {
         {/* AI Scanning Animation Layer */}
         {status === "uploading" && (
           <div className="absolute inset-0 pointer-events-none">
-             <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_15px_rgba(16,185,129,0.8)] z-10" />
+             <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500 animate-scan shadow-[0_0_15px_rgba(16,185,129,0.8)] z-10" />
              <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent animate-pulse" />
           </div>
         )}
