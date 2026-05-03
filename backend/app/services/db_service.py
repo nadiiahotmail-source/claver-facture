@@ -257,3 +257,53 @@ class DBService:
             print(f"Audit Log Error: {e}")
         finally:
             self._release_connection(conn)
+
+    def create_appointment(self, data: dict) -> Optional[Dict[str, Any]]:
+        """Inserts a new appointment/demo request from the landing page."""
+        conn = self._get_connection()
+        if not conn: return None
+        try:
+            cur = conn.cursor()
+            query = """
+                INSERT INTO appointments (
+                    client_name, client_email, client_phone, 
+                    appointment_date, appointment_time, status
+                )
+                VALUES (%s, %s, %s, %s, %s, 'scheduled')
+                RETURNING *;
+            """
+            cur.execute(query, (
+                data.get('client_name'),
+                data.get('client_email'),
+                data.get('client_phone'),
+                data.get('appointment_date'),
+                data.get('appointment_time')
+            ))
+            result = cur.fetchone()
+            conn.commit()
+            columns = [desc[0] for desc in cur.description]
+            cur.close()
+            return dict(zip(columns, result))
+        except Exception as e:
+            print(f"Error creating appointment: {e}")
+            conn.rollback()
+            return None
+        finally:
+            self._release_connection(conn)
+
+    def get_all_appointments(self) -> List[Dict[str, Any]]:
+        """Fetches all appointments for the admin hub."""
+        conn = self._get_connection()
+        if not conn: return []
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM appointments ORDER BY appointment_date DESC, appointment_time DESC;")
+            rows = cur.fetchall()
+            columns = [desc[0] for desc in cur.description]
+            cur.close()
+            return [dict(zip(columns, row)) for row in rows]
+        except Exception as e:
+            print(f"Error fetching appointments: {e}")
+            return []
+        finally:
+            self._release_connection(conn)

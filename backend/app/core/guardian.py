@@ -16,6 +16,31 @@ class Sentinel:
             "bce": r"\b\d{10}\b"
         }
 
+    def sanitize_input(self, text: str) -> str:
+        """
+        Supprime les tentatives d'injection de prompts courantes et les caractères dangereux.
+        """
+        if not text:
+            return ""
+        
+        # Supprime les marqueurs de délimitation que nous utilisons pour nos propres prompts
+        # pour éviter qu'un utilisateur n'injecte un faux délimiteur.
+        text = text.replace("###", "").replace("[[", "").replace("]]", "")
+        
+        # Supprime les patterns d'évasion d'IA communs
+        forbidden_patterns = [
+            r"ignore all previous instructions",
+            r"ignore les instructions précédentes",
+            r"system reboot",
+            r"you are now a",
+            r"tu es maintenant un"
+        ]
+        
+        for pattern in forbidden_patterns:
+            text = re.sub(pattern, "[PROTECTED]", text, flags=re.IGNORECASE)
+            
+        return text.strip()
+
     def verify_data(self, data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         """
         Ensures extracted data doesn't contain forbidden items and masks them for logging.

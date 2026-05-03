@@ -1,5 +1,7 @@
 import google.generativeai as genai
 import resend
+import os
+from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -60,21 +62,23 @@ class EmailSender:
                 "body": f"Bonjour {client_name},\n\nSauf erreur de notre part, le paiement de votre prime {insurer} de {amount}€ n'est pas encore parvenu.\n\nCordialement."
             }
 
-    async def send_email(self, recipient_email: str, subject: str, body: str):
+    async def send_email(self, recipient_email: str, subject: str, body: str, api_key: Optional[str] = None):
         """Sends an e-mail using Resend API."""
-        if not resend.api_key or resend.api_key == "votre_cle_resend":
+        active_key = api_key or os.getenv("RESEND_API_KEY")
+        
+        if not active_key or active_key == "votre_cle_resend":
             print("EmailSender: [SIMULATION] Resend API key missing.")
             return True
 
         try:
+            resend.api_key = active_key
             params = {
-                "from": "Claver Facture <onboarding@resend.dev>", # Default for test, update for prod
+                "from": "Claver Facture <onboarding@resend.dev>", 
                 "to": [recipient_email],
                 "subject": subject,
                 "html": body.replace("\n", "<br>")
             }
             email = resend.Emails.send(params)
-            print(f"EmailSender: Sent via Resend ID: {email.get('id')}")
             return True
         except Exception as e:
             print(f"EmailSender Error: {e}")

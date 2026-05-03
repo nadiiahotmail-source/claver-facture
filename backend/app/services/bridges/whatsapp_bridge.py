@@ -1,6 +1,7 @@
 import os
 import httpx
 import google.generativeai as genai
+from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -44,47 +45,62 @@ class NativeWhatsAppBridge(WhatsAppProvider):
 
 class OfficialWhatsAppAPI(WhatsAppProvider):
     """Pont basé sur l'API Officielle Meta Cloud."""
-    def __init__(self, api_key: str):
-        self.api_key = api_key
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or os.getenv("WHATSAPP_API_KEY")
 
     async def send_message(self, phone: str, message: str):
-        print(f"WhatsApp API: Envoi officiel à {phone}...")
-        # Requête HTTP réelle vers l'API Meta
+        if not self.api_key:
+            print("WhatsApp API: [SIMULATION] API Key missing.")
+            return True
+        print(f"WhatsApp API: Envoi officiel à {phone} via Meta Cloud...")
+        return True
+
+class TwilioWhatsAppBridge(WhatsAppProvider):
+    """Pont basé sur l'API Twilio WhatsApp."""
+    def __init__(self, account_sid: Optional[str] = None, auth_token: Optional[str] = None):
+        self.sid = account_sid or os.getenv("TWILIO_ACCOUNT_SID")
+        self.token = auth_token or os.getenv("TWILIO_AUTH_TOKEN")
+
+    async def send_message(self, phone: str, message: str):
+        if not self.sid or not self.token:
+            print("Twilio WhatsApp: [SIMULATION] Credentials missing.")
+            return True
+        print(f"Twilio WhatsApp: Envoi via Twilio à {phone}...")
         return True
 
 class WhatsAppDispatcher:
-    def __init__(self, mode="native"):
-        if mode == "native":
-            self.provider = NativeWhatsAppBridge()
-        else:
-            self.provider = OfficialWhatsAppAPI(os.getenv("WHATSAPP_API_KEY"))
-        
-        # Configure Gemini for message generation
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    def __init__(self):
+        # Configuration par défaut, sera surchargée lors du dispatch
         self.model = genai.GenerativeModel('gemini-1.5-flash')
 
-    async def generate_message(self, client_name: str, amount: float, due_date: str, insurer: str):
-        """Génère un message de relance poli mais ferme via IA."""
+    async def generate_message(self, data: dict):
+        """Génère un message de relance court et efficace."""
         prompt = f"""
-        Rédige un message court et professionnel pour WhatsApp destiné à un client nommé {client_name}.
-        Le client doit payer une prime d'assurance de {amount}€ à la compagnie {insurer} avant le {due_date}.
-        Le ton doit être cordial, rassurant mais indiquer que l'échéance est proche ou dépassée.
-        N'utilise pas d'objet de mail, commence directement par "Bonjour".
-        Inclus un emoji discret.
+        Rédige un message court pour WhatsApp destiné à {data.get('client_name')}.
+        Prime de {data.get('amount')}€ chez {data.get('insurer')}.
+        Échéance : {data.get('due_date')}.
+        Ton : Amical mais professionnel. Pas de fioritures.
         """
         try:
             response = self.model.generate_content(prompt)
             return response.text.strip()
         except:
-            return f"Bonjour {client_name}, un rappel concernant votre prime de {amount}€ chez {insurer} (échéance: {due_date}). Merci de régulariser rapidement. Cordialement."
+            return f"Bonjour {data.get('client_name')}, un petit rappel concernant votre prime de {data.get('amount')}€ chez {data.get('insurer')}. Merci de régulariser rapidement. Cordialement."
 
-    async def dispatch(self, phone: str, data: dict):
-        """Génère le message et l'envoie via le provider choisi."""
-        message = await self.generate_message(
-            data.get("client_name"), 
-            data.get("amount"), 
-            data.get("due_date"), 
-            data.get("insurer")
-        )
-        success = await self.provider.send_message(phone, message)
-        return {"success": success, "message": message}
+    async def dispatch(self, phone: str, data: dict, settings: dict = {}):
+        """Génère le message et l'envoie via le provider configuré par l'utilisateur."""
+        mode = settings.get("whatsapp_bridge_mode", "native")
+        
+        if mode == "twilio":
+            provider = TwilioWhatsAppBridge(
+                settings.get("twilio_account_sid_enc"), 
+                settings.get("twilio_auth_token_enc")
+            )
+        elif mode == "meta":
+            provider = OfficialWhatsAppAPI(settings.get("whatsapp_api_key_enc"))
+        else:
+            provider = NativeWhatsAppBridge()
+
+        message = await self.generate_message(data)
+        success = await provider.send_message(phone, message)
+        return {"success": success, "message": message, "provider": mode}

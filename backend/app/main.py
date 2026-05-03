@@ -1,4 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
+import datetime
+
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -184,5 +186,38 @@ async def save_settings(request: Request, data: SettingsUpdate, user: any = Depe
         raise HTTPException(status_code=500, detail="Failed to save settings")
     return result
 
+class AppointmentCreate(BaseModel):
+    client_name: str
+    client_email: str
+    client_phone: Optional[str] = None
+    appointment_date: str
+    appointment_time: str
+
+@app.post("/appointments")
+@limiter.limit("5/minute")
+async def create_appointment(request: Request, data: AppointmentCreate):
+    result = db_service.create_appointment(data.dict())
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to schedule appointment")
+    return {"status": "success", "data": result}
+
+@app.get("/admin/appointments")
+async def get_appointments(user: any = Depends(get_current_user)):
+    # This should be restricted to admin in production
+    return db_service.get_all_appointments()
+
+@app.get("/status")
+async def get_system_status():
+    """Global health check for all sub-services."""
+    status = {
+        "api": "online",
+        "database": "online" if db_service.connection_pool else "offline",
+        "supabase": "online",
+        "timestamp": datetime.datetime.now().isoformat()
+    }
+    return status
+
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+
+

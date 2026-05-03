@@ -15,3 +15,9 @@ supabase/.temp/
 # OS
 .DS_Store
 Thumbs.db
+
+.vercel
+backend/temp_files/
+scratch/
+mock_db.json
+*.log
