@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -30,6 +31,13 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
+
+# Ensure temp_files exists for local preview fallback
+TEMP_DIR = "temp_files"
+if not os.path.exists(TEMP_DIR):
+    os.makedirs(TEMP_DIR)
+
+app.mount("/temp_files", StaticFiles(directory=TEMP_DIR), name="temp_files")
 
 security = HTTPBearer(auto_error=False)
 db_service = DBService()
@@ -99,7 +107,8 @@ async def upload_invoice(request: Request, file: UploadFile = File(...), user: a
         raise HTTPException(status_code=400, detail="Format non supporté")
     
     unique_id = uuid.uuid4()
-    temp_path = f"temp_{unique_id}{ext}"
+    filename = f"temp_{unique_id}{ext}"
+    temp_path = os.path.join(TEMP_DIR, filename)
     
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -111,8 +120,9 @@ async def upload_invoice(request: Request, file: UploadFile = File(...), user: a
             raise HTTPException(status_code=500, detail=result["message"])
         return result["data"]
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        # We keep the file in temp_files for the local preview fallback in the dashboard
+        # It will be served via the static mount.
+        pass
 
 @app.post("/reminders/validate/{reminder_id}")
 async def validate_reminder(reminder_id: str, data: ValidationRequest, user: any = Depends(get_current_user)):

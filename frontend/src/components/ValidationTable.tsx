@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Bot,
   Euro,
-  Calendar
+  Calendar,
+  FileText
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -135,7 +136,7 @@ export default function ValidationTable({ data, onDispatch, onGenerateDraft, onA
       {/* MODAL */}
       {selectedItem && (
         <div className="fixed inset-0 z-[200] flex items-end lg:items-center justify-center p-0 lg:p-4 bg-slate-950/20 backdrop-blur-sm transition-all">
-          <div className="bg-white w-full h-[90vh] lg:h-auto lg:max-w-2xl lg:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-white w-full h-[90vh] lg:h-auto lg:max-w-5xl lg:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
             
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
@@ -143,7 +144,7 @@ export default function ValidationTable({ data, onDispatch, onGenerateDraft, onA
                     <Bot className="w-5 h-5" />
                  </div>
                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">{selectedItem.client_name}</h3>
+                    <h3 className="font-bold text-slate-900 text-sm">{selectedItem.client_name || "Client Inconnu"}</h3>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dossier {currentIndex + 1}/{data.length}</p>
                  </div>
               </div>
@@ -157,36 +158,55 @@ export default function ValidationTable({ data, onDispatch, onGenerateDraft, onA
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-               <div className="space-y-3">
-                  <div className="flex justify-between items-center px-1">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sujet de la relance</label>
-                     <button onClick={handleRegenerate} disabled={isRegenerating} className="text-[10px] text-emerald-600 font-black flex items-center gap-1.5 hover:underline disabled:opacity-50">
-                        <RefreshCw className={cn("w-3 h-3", isRegenerating && "animate-spin")} /> Régénérer
-                     </button>
-                  </div>
-                  <input 
-                    type="text" 
-                    value={emailSubject} 
-                    onChange={(e) => setEmailSubject(e.target.value)}
-                    className="w-full text-sm font-bold border border-slate-200 rounded-2xl p-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all bg-slate-50/50"
-                  />
+            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row">
+               {/* PREVIEW PANEL */}
+               <div className="hidden lg:block w-1/2 bg-slate-100 border-r border-slate-200 overflow-hidden">
+                  {selectedItem.file_url ? (
+                    <iframe 
+                      src={selectedItem.file_url} 
+                      className="w-full h-full border-none"
+                      title="Preview Document"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-4">
+                       <FileText className="w-12 h-12 opacity-20" />
+                       <p className="text-[10px] font-black uppercase tracking-widest">Aperçu non disponible</p>
+                    </div>
+                  )}
                </div>
 
-               <div className="space-y-3 flex-1 flex flex-col">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Message personnalisé</label>
-                  <div className="relative flex-1 min-h-[200px]">
-                    {isRegenerating && (
-                      <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-emerald-600 rounded-2xl">
-                        <LoaderIcon className="w-8 h-8 animate-spin" />
-                      </div>
-                    )}
-                    <textarea 
-                      value={emailBody}
-                      onChange={(e) => setEmailBody(e.target.value)}
-                      className="w-full h-full text-sm font-medium border border-slate-200 rounded-3xl p-5 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all resize-none leading-relaxed text-slate-700 bg-slate-50/50"
+               {/* EDITOR PANEL */}
+               <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+                 <div className="space-y-3">
+                    <div className="flex justify-between items-center px-1">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sujet de la relance</label>
+                       <button onClick={handleRegenerate} disabled={isRegenerating} className="text-[10px] text-emerald-600 font-black flex items-center gap-1.5 hover:underline disabled:opacity-50">
+                          <RefreshCw className={cn("w-3 h-3", isRegenerating && "animate-spin")} /> Régénérer
+                       </button>
+                    </div>
+                    <input 
+                      type="text" 
+                      value={emailSubject} 
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      className="w-full text-sm font-bold border border-slate-200 rounded-2xl p-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all bg-slate-50/50"
                     />
-                  </div>
+                 </div>
+
+                 <div className="space-y-3 flex-1 flex flex-col">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Message personnalisé</label>
+                    <div className="relative flex-1 min-h-[300px]">
+                      {isRegenerating && (
+                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center text-emerald-600 rounded-2xl">
+                          <LoaderIcon className="w-8 h-8 animate-spin" />
+                        </div>
+                      )}
+                      <textarea 
+                        value={emailBody}
+                        onChange={(e) => setEmailBody(e.target.value)}
+                        className="w-full h-full text-sm font-medium border border-slate-200 rounded-3xl p-5 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all resize-none leading-relaxed text-slate-700 bg-slate-50/50"
+                      />
+                    </div>
+                 </div>
                </div>
             </div>
 
@@ -210,7 +230,7 @@ const TableRow = React.memo(({ item, onOpen, onDispatch, onMarkPaid }: any) => (
   <tr className="hover:bg-slate-50/50 transition-colors group">
     <td className="px-6 py-4">
       <div className="font-bold text-slate-900 flex items-center gap-2">
-        {item.client_name}
+        {item.client_name || "Sans Nom"}
         {item.client_type && (
           <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">
             {item.client_type}
@@ -224,7 +244,7 @@ const TableRow = React.memo(({ item, onOpen, onDispatch, onMarkPaid }: any) => (
       )}
     </td>
     <td className="px-6 py-4 text-slate-500 font-medium">{item.insurer}</td>
-    <td className="px-6 py-4 font-bold text-slate-900">{item.amount.toLocaleString('fr-BE')} €</td>
+    <td className="px-6 py-4 font-bold text-slate-900">{(item.amount || 0).toLocaleString('fr-BE')} €</td>
     <td className="px-6 py-4 text-slate-400 font-mono text-xs">{item.due_date}</td>
     <td className="px-6 py-4">
       {item.phase && <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">Phase {item.phase}</span>}
@@ -260,7 +280,7 @@ const MobileCard = React.memo(({ item, onOpen, onDispatch, onMarkPaid }: any) =>
       <StatusBadge status={item.status} />
     </div>
     <div className="grid grid-cols-2 gap-2 text-xs">
-      <div className="flex items-center gap-2 text-slate-500 font-bold"><Euro className="w-3 h-3" /> {item.amount.toLocaleString('fr-BE')} €</div>
+      <div className="flex items-center gap-2 text-slate-500 font-bold"><Euro className="w-3 h-3" /> {(item.amount || 0).toLocaleString('fr-BE')} €</div>
       <div className="flex items-center gap-2 text-slate-400"><Calendar className="w-3 h-3" /> {item.due_date}</div>
     </div>
     <div className="flex gap-2 pt-1">

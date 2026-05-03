@@ -34,6 +34,7 @@ class StorageService:
         except Exception as e:
             print(f"Storage Upload Error: {e}")
             # Fallback for dev: return a local relative path as "URL"
-            return f"/temp_files/{os.path.basename(file_path)}"
+            backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+            return f"{backend_url}/temp_files/{os.path.basename(file_path)}"
 
 storage_service = StorageService()

@@ -81,14 +81,14 @@ export default function StudioPage() {
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${
                     selectedId === item.id ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600 group-hover:bg-slate-100'
                   }`}>
-                    {item.client_name.substring(0, 2).toUpperCase()}
+                    {(item.client_name || "??").substring(0, 2).toUpperCase()}
                   </div>
                   
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-1">
                       <span className={`text-sm font-bold truncate ${selectedId === item.id ? 'text-slate-900' : 'text-slate-700'}`}>
-                        {item.client_name}
+                        {item.client_name || "Client Inconnu"}
                       </span>
                       <span className={`text-[10px] font-black tracking-wider ${selectedId === item.id ? 'text-emerald-600' : 'text-slate-400'}`}>
                         {item.amount}€
